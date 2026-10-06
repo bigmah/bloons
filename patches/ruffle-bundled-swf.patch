@@ -1,0 +1,70 @@
+diff --git a/desktop/src/main.rs b/desktop/src/main.rs
+index 2265dc24..d05f490b 100644
+--- a/desktop/src/main.rs
++++ b/desktop/src/main.rs
+@@ -141,6 +141,39 @@ fn panic_hook(info: &PanicHookInfo) {
+     }
+ }
+ 
++/// Title of the game bundled inside this app, if launched from a standalone game bundle.
++pub static BUNDLED_TITLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
++
++/// If no movie was given on the command line, look for a single SWF in the app bundle's
++/// `Contents/Resources/game` directory and play it without the menu bar.
++fn apply_bundled_movie(opt: &mut Opt) {
++    if opt.movie_url.is_some() {
++        return;
++    }
++    let Some(game_dir) = env::current_exe()
++        .ok()
++        .and_then(|exe| exe.parent()?.parent().map(|c| c.join("Resources").join("game")))
++    else {
++        return;
++    };
++    let Some(swf) = std::fs::read_dir(&game_dir).ok().and_then(|entries| {
++        entries
++            .filter_map(|e| e.ok().map(|e| e.path()))
++            .find(|p| p.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("swf")))
++    }) else {
++        return;
++    };
++    if let Ok(url) = Url::from_file_path(&swf) {
++        let title = swf
++            .file_stem()
++            .map(|s| s.to_string_lossy().into_owned())
++            .unwrap_or_default();
++        let _ = BUNDLED_TITLE.set(title);
++        opt.movie_url = Some(url);
++        opt.no_gui = true;
++    }
++}
++
+ fn main() -> Result<(), Error> {
+     let prev_hook = std::panic::take_hook();
+     std::panic::set_hook(Box::new(move |info| {
+@@ -151,7 +184,8 @@ fn main() -> Result<(), Error> {
+     #[cfg(windows)]
+     let _console = windows::Console::attach();
+ 
+-    let opt = Opt::parse();
++    let mut opt = Opt::parse();
++    apply_bundled_movie(&mut opt);
+ 
+     #[cfg(feature = "shell-completions")]
+     if let Some(shell) = opt.completions {
+diff --git a/desktop/src/player.rs b/desktop/src/player.rs
+index 52ebe837..80de89f0 100644
+--- a/desktop/src/player.rs
++++ b/desktop/src/player.rs
+@@ -339,7 +339,10 @@ impl ActivePlayer {
+             .with_avm2_optimizer_enabled(opt.avm2_optimizer_enabled);
+         let player = builder.build();
+ 
+-        window.set_title(&format!("Ruffle - {readable_name}"));
++        match crate::BUNDLED_TITLE.get() {
++            Some(title) => window.set_title(title),
++            None => window.set_title(&format!("Ruffle - {readable_name}")),
++        }
+ 
+         SWF_INFO.with(|i| *i.borrow_mut() = Some(readable_name));
+ 
