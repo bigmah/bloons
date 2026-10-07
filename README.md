@@ -59,12 +59,29 @@ or run `xattr -cr "Bloons TD.app"`.
 python3 -m http.server -d web 8000   # then open http://localhost:8000
 ```
 
-This produces a static site: an `index.html` that links to each game, one full-window page per
-game, the SWFs in `web/games/`, and Ruffle's `ruffle.js` and `.wasm` files in `web/ruffle/`.
-Browsers can't load WebAssembly from `file://`, so serve it over HTTP. Any static host
-(GitHub Pages, Netlify, etc.) works.
+This produces a static site: an `index.html` that links to each game, one page per game
+(`bloons-td-1.html` … `bloons-td-4.html`), the SWFs in `web/games/`, and Ruffle's `ruffle.js`
+and `.wasm` files in `web/ruffle/`. Browsers can't load WebAssembly from `file://`, so serve
+it over HTTP. Any static host (GitHub Pages, Netlify, etc.) works.
 
-Downloading the latest build requires the GitHub CLI (`gh`).
+Downloading the latest build requires the GitHub CLI (`gh`). Set `RUFFLE_TAG` to pin a
+specific Ruffle release instead of the newest one.
+
+### Embedding a game in another page
+
+Each game page fills whatever box it is shown in, letterboxed on black, and `web/` only uses
+relative paths. Copy the whole directory onto a site (say as `bloons/`) and drop a game in
+with an iframe:
+
+```html
+<iframe src="bloons/bloons-td-2.html" allow="autoplay; fullscreen"
+        style="width: 640px; aspect-ratio: 4 / 3; border: 0"></iframe>
+```
+
+BTD 1–3 have a 640×480 stage and BTD 4 a 640×640 one; any other box is letterboxed. Nothing is
+downloaded until the iframe loads, and then it is about 14 MB of Ruffle (shared by all four
+games and cached after the first) plus the game's SWF (0.5–2.9 MB). `allow="autoplay"` lets
+sound start when the iframe is created from a click.
 
 ## Known quirks
 
